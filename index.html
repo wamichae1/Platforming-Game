@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HoloNight - Platformer Game</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p5.play@1.0.0/lib/p5.play.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.sound.min.js"></script>
+    <script>
+        // Debug library loading
+        window.addEventListener('load', function() {
+            console.log('Page loaded');
+            console.log('p5 available:', typeof p5 !== 'undefined');
+            console.log('p5.play available:', typeof p5.play !== 'undefined');
+            console.log('p5.sound available:', typeof p5.sound !== 'undefined');
+            if (typeof p5.play !== 'undefined') {
+                console.log('p5.play version:', p5.play.version || 'unknown');
+            }
+        });
+    </script>
+</head>
+<body>
+    <div id="game-container">
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="screen active">
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Loading HoloNight...</div>
+            </div>
+        </div>
+
+        <!-- Title Screen -->
+        <div id="title-screen" class="screen hidden">
+            <div class="title-content">
+                <h1>HoloNight</h1>
+                <div class="title-menu">
+                    <button id="start-btn">START GAME</button>
+                    <button id="level-select-btn">LEVEL SELECT</button>
+                    <button id="settings-btn">SETTINGS</button>
+                    <button id="credits-btn">CREDITS</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Level Select Screen -->
+        <div id="level-select-screen" class="screen hidden">
+            <div class="level-select-content">
+                <h2>SELECT LEVEL</h2>
+                <div id="level-grid">
+                    <button class="level-btn" data-level="1">LEVEL 1</button>
+                    <button class="level-btn" data-level="2">LEVEL 2</button>
+                    <button class="level-btn" data-level="3">LEVEL 3</button>
+                    <button class="level-btn" data-level="4">LEVEL 4</button>
+                    <button class="level-btn" data-level="5">LEVEL 5</button>
+                    <button class="level-btn" data-level="6">LEVEL 6</button>
+                </div>
+                <button id="back-to-title">BACK TO MENU</button>
+            </div>
+        </div>
+
+        <!-- Settings Screen -->
+        <div id="settings-screen" class="screen hidden">
+            <div class="settings-content">
+                <h2>SETTINGS</h2>
+                <div class="settings-section">
+                    <h3>Volume</h3>
+                    <div class="volume-control">
+                        <span>Master Volume:</span>
+                        <input type="range" id="volume-slider" min="0" max="100" value="50">
+                        <span id="volume-value">50%</span>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>Key Bindings</h3>
+                    <div class="key-binding-rows">
+                        <div class="key-binding-row"><span>Move Left:</span> <button class="key-bind-btn" id="bind-move-left">A</button></div>
+                        <div class="key-binding-row"><span>Move Right:</span> <button class="key-bind-btn" id="bind-move-right">D</button></div>
+                        <div class="key-binding-row"><span>Jump:</span> <button class="key-bind-btn" id="bind-jump">Space</button></div>
+                        <div class="key-binding-row"><span>Dash:</span> <button class="key-bind-btn" id="bind-dash">E</button></div>
+                        <div class="key-binding-row"><span>Attack:</span> <button class="key-bind-btn" id="bind-attack">LMB</button></div>
+                        <div class="key-binding-row"><span>Look Up:</span> <button class="key-bind-btn" id="bind-look-up">W</button></div>
+                        <div class="key-binding-row"><span>Look Down:</span> <button class="key-bind-btn" id="bind-look-down">S</button></div>
+                    </div>
+                </div>
+                <button id="reset-to-default-btn">↻ Reset Keybinds</button>
+                <button id="back-to-menu-btn">Back to Menu</button>
+            </div>
+        </div>
+
+        <!-- Credits Screen -->
+        <div id="credits-screen" class="screen hidden">
+            <div class="credits-content">
+                <h2>CREDITS</h2>
+                <div class="credits-section">
+                    <h3>Game Development</h3> 
+                    <p>Created with p5.js and p5.play</p>
+                </div>
+                <div class="credits-section">
+                    <h3>Graphics</h3>
+                    <p>Pixel art sprites and animations</p>
+                </div>
+                <div class="credits-section">
+                    <h3>Github</h3>
+                    <p>We will add it later</p>
+                </div>
+                <button id="credits-back-btn">Back to Menu</button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen hidden">
+            <div class="game-ui">
+                <!-- Pause Button -->
+                <div id="pause-button">
+                    <button id="pause-btn">
+                        <div class="pause-icon">
+                            <div class="pause-bar"></div>
+                            <div class="pause-bar"></div>
+                        </div>
+                    </button>
+                </div>
+                
+                <!-- Game UI Overlay -->
+                <div id="ui-overlay">
+                    <div id="level">Time: <span id="level-value">0.00</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen Transition Overlay -->
+        <div id="transition-overlay" class="transition-overlay hidden"></div>
+
+        <!-- Modal Overlays -->
+        <div id="pause-overlay" class="modal-overlay">
+            <div id="pause-modal" class="modal">
+                <h2>PAUSED</h2>
+                <div class="modal-buttons">
+                    <button id="resume-btn">RESUME</button>
+                    <button id="pause-settings-btn">SETTINGS</button>
+                    <button id="pause-back-menu-btn">MAIN MENU</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-over-overlay" class="modal-overlay">
+            <div id="game-over-modal" class="modal">
+                <h2>GAME OVER!</h2>
+                <div class="modal-buttons">
+                    <button id="restart-btn">PLAY AGAIN</button>
+                    <button id="game-over-menu-btn">MAIN MENU</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="level-complete-overlay" class="modal-overlay">
+            <div id="level-complete-modal" class="modal">
+                <h2>LEVEL COMPLETE!</h2>
+                <p id="completion-time">Total Time: 0.00 seconds</p>
+                <div class="modal-buttons">
+                    <button id="level-restart-btn">PLAY AGAIN</button>
+                    <button id="level-menu-btn">MAIN MENU</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="game.js"></script>
+</body>
+</html> 
