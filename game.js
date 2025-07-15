@@ -155,6 +155,14 @@ class ScreenManager {
                 if (gameState !== 'playing') {
                     startGame();
                 }
+                // Auto-focus canvas when game starts
+                setTimeout(() => {
+                    const canvas = document.querySelector('#game-container canvas');
+                    if (canvas) {
+                        console.log('Auto-focusing canvas for game input...');
+                        canvas.focus();
+                    }
+                }, 100);
                 break;
             case 'settings':
                 // Settings screen specific logic
@@ -183,8 +191,8 @@ let screenManager;
 // Game state variables
 let gameState = 'menu'; // 'menu', 'settings', 'playing', 'gameOver', 'levelComplete'
 let gamePaused = false; // Track if game is paused
-let currentLevel = 1;
-let currentScreen = 0; // 0 = spikes, 1 = yellow enemies, 2 = blue enemies, 3 = white enemies
+let currentLevel = 1; // Current level (1-6)
+let currentScreen = 0; // Current screen within level (0-3)
 let player;
 let obstacles = []; // Wall obstacles to dodge
 let spikes = []; // Ground spikes that kill the player
@@ -305,6 +313,27 @@ function setup() {
     canvas.style('z-index', '1');
     canvas.style('display', 'block');
     
+    // Add focus handling to canvas
+    canvas.elt.addEventListener('click', function() {
+        console.log('Canvas clicked, focusing for input...');
+        canvas.elt.focus();
+    });
+    
+    // Auto-focus canvas when game starts
+    canvas.elt.tabIndex = 0;
+    canvas.elt.style.outline = 'none';
+    
+    // Add focus/blur event listeners for debugging
+    // canvas.elt.addEventListener('focus', function() {
+    //     console.log('Canvas focused - keyboard input should work now');
+    //     canvas.elt.style.border = '2px solid #00ff00';
+    // });
+    //
+    // canvas.elt.addEventListener('blur', function() {
+    //     console.log('Canvas lost focus - keyboard input may not work');
+    //     canvas.elt.style.border = '2px solid #ff0000';
+    // });
+    
     console.log('Canvas created with size: 1280 x 720');
     console.log('Canvas element:', canvas.elt);
     
@@ -343,12 +372,20 @@ window.addEventListener('DOMContentLoaded', function() {
             setupKeyBindingUI();
         }
     }, 100);
+    
+    // Add global debug key listener
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'F1') {
+            event.preventDefault();
+            debugInputStatus();
+        }
+    });
 });
 
 function windowResized() {
     resizeCanvas(1280, 720);
     if (gameState === 'playing') {
-        loadLevel(currentLevel - 1);
+        resetCurrentScreen();
     }
 }
 
@@ -396,14 +433,14 @@ function draw() {
             return;
         }
         
-        // Spawn timer for screen-specific enemies
-        spawnTimer++;
-        console.log('Spawn timer:', spawnTimer, '/', spawnInterval); // Debug spawn timer
-        if (spawnTimer >= spawnInterval) {
-            console.log('Spawning screen-specific enemy!'); // Debug spawn trigger
-            spawnScreenSpecificEnemy();
-            spawnTimer = 0;
-        }
+        // Spawn timer for screen-specific enemies (disabled for now)
+        // spawnTimer++;
+        // console.log('Spawn timer:', spawnTimer, '/', spawnInterval); // Debug spawn timer
+        // if (spawnTimer >= spawnInterval) {
+        //     console.log('Spawning screen-specific enemy!'); // Debug spawn trigger
+        //     spawnScreenSpecificEnemy();
+        //     spawnTimer = 0;
+        // }
         
         // Update all moving objects
         enemies.forEach(enemy => enemy.update());
@@ -475,6 +512,8 @@ function drawTitleScreen() {
 
 function drawLevelSelectScreen() {
     // Level select screen is now handled by HTML
+    // Draw a background for the level select screen
+    background(0, 0, 0); // Black background
 }
 
 function drawGameOverScreen() {
@@ -492,21 +531,15 @@ function setupEventListeners() {
     
     // Title screen buttons
     const startBtn = document.getElementById('start-btn');
-    const levelSelectBtn = document.getElementById('level-select-btn');
     const settingsBtn = document.getElementById('settings-btn');
     const creditsBtn = document.getElementById('credits-btn');
     
     if (startBtn) {
         startBtn.addEventListener('click', function() {
             console.log('Start button clicked');
-            screenManager.showScreen('game');
-        });
-    }
-    
-    if (levelSelectBtn) {
-        levelSelectBtn.addEventListener('click', function() {
-            console.log('Level select button clicked');
-            screenManager.showScreen('levelSelect');
+            currentLevel = 1;
+            currentScreen = 0;
+            startGame();
         });
     }
     
@@ -525,24 +558,28 @@ function setupEventListeners() {
     }
     
     // Level select buttons
-    const backToTitleBtn = document.getElementById('back-to-title');
-    const levelBtns = document.querySelectorAll('.level-btn');
+    for (let i = 1; i <= 6; i++) {
+        const levelBtn = document.getElementById(`level-${i}-btn`);
+        if (levelBtn) {
+            levelBtn.addEventListener('click', function() {
+                console.log(`Level ${i} button clicked`);
+                currentLevel = i;
+                currentScreen = 0;
+                startGame();
+            });
+        }
+    }
     
-    if (backToTitleBtn) {
-        backToTitleBtn.addEventListener('click', function() {
-            console.log('Back to title button clicked');
+    // Level select back button
+    const levelSelectBackBtn = document.getElementById('level-select-back-btn');
+    if (levelSelectBackBtn) {
+        levelSelectBackBtn.addEventListener('click', function() {
+            console.log('Level select back button clicked');
             screenManager.showScreen('title');
         });
     }
     
-    levelBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const level = parseInt(this.dataset.level);
-            console.log(`Level ${level} selected`);
-            currentLevel = level;
-            screenManager.showScreen('game');
-        });
-    });
+
     
     // Settings screen buttons
     const backToMenuBtn = document.getElementById('back-to-menu-btn');
@@ -709,15 +746,13 @@ function setupEventListeners() {
             return;
         }
         
-        if (gameState === 'playing' && !gamePaused) {
-            handleGameKeyDown(event);
-        }
+        // Key handling is done through isKeyDownFor function in Player class
+        // No need for separate handleGameKeyDown function
     });
     
     document.addEventListener('keyup', function(event) {
-        if (gameState === 'playing' && !gamePaused) {
-            handleGameKeyUp(event);
-        }
+        // Key handling is done through isKeyDownFor function in Player class
+        // No need for separate handleGameKeyUp function
     });
     
     // Mouse event listeners for attack
@@ -755,7 +790,8 @@ function toggleGameMenu() {
 
 function resetLevel() {
     console.log('Resetting level...');
-    loadLevel(currentLevel - 1);
+    currentScreen = 0; // Reset to first screen of current level
+    resetCurrentScreen();
     toggleGameMenu(); // Close the dropdown
 }
 
@@ -801,7 +837,7 @@ function showLevelComplete() {
     // Update the level complete header
     const levelCompleteHeader = document.querySelector('#level-complete-modal h2');
     if (levelCompleteHeader) {
-        levelCompleteHeader.textContent = `LEVEL ${currentLevel} COMPLETE!`;
+        levelCompleteHeader.textContent = `GAME COMPLETE!`;
     }
     // Update the completion time
     const completionTimeElem = document.getElementById('completion-time');
@@ -881,22 +917,47 @@ function checkCollisions() {
             player.sprite.y < obstacle.y + obstacle.h &&
             player.sprite.y + player.sprite.h > obstacle.y
         ) {
-            // Check if player is landing on top of obstacle
-            if (player.sprite.y + player.sprite.h > obstacle.y && player.sprite.y < obstacle.y) {
+            // More strict check for landing on top of obstacle
+            // Player must be falling (positive velocity) and close to the top surface
+            let tolerance = 8; // 8 pixel tolerance for landing - more forgiving
+            let isFalling = player.sprite.velocity.y > 0;
+            let isCloseToTop = (player.sprite.y + player.sprite.h) - obstacle.y < tolerance;
+            let isAbovePlatform = player.sprite.y < obstacle.y;
+            
+            if (isFalling && isCloseToTop && isAbovePlatform) {
+                // Player is actually landing on top of the platform
                 player.sprite.y = obstacle.y - player.sprite.h;
                 player.sprite.velocity.y = 0;
                 player.onGround = true; // Mark that player is on a platform
                 player.justLanded = true; // Mark that player just landed
+                console.log('Player landed on platform at', obstacle.x, obstacle.y);
             } else {
-                // Player hit obstacle from the side - block movement
-                if (player.sprite.x < obstacle.x) {
-                    // Player hit obstacle from left side - block movement
-                    player.sprite.x = obstacle.x - player.sprite.w;
-                    player.sprite.velocity.x = 0;
+                // Check if player hit the bottom of the platform
+                let isHittingBottom = player.sprite.y < obstacle.y + obstacle.h && 
+                                    player.sprite.y + player.sprite.h > obstacle.y + obstacle.h;
+                let isAbovePlatform = player.sprite.y < obstacle.y;
+                let isMovingUp = player.sprite.velocity.y < 0; // Check if player is moving upward
+                let isCloseToBottom = Math.abs((player.sprite.y + player.sprite.h) - (obstacle.y + obstacle.h)) < 5; // Within 5 pixels of bottom
+                
+                console.log('Collision debug - isHittingBottom:', isHittingBottom, 'isAbovePlatform:', isAbovePlatform, 'isMovingUp:', isMovingUp, 'isCloseToBottom:', isCloseToBottom);
+                
+                if (isHittingBottom && isAbovePlatform && !isMovingUp && player.sprite.velocity.y >= 0 && isCloseToBottom) {
+                    // Player hit the bottom of the platform - just block movement, no teleporting
+                    player.sprite.y = obstacle.y + obstacle.h;
+                    player.sprite.velocity.y = 0;
+                    console.log('Player hit bottom of platform at', obstacle.x, obstacle.y);
                 } else {
-                    // Player hit obstacle from right side - block movement
-                    player.sprite.x = obstacle.x + obstacle.w;
-                    player.sprite.velocity.x = 0;
+                    // Player hit obstacle from the side - block movement only
+                    if (player.sprite.x < obstacle.x) {
+                        // Player hit obstacle from left side - block movement
+                        player.sprite.x = obstacle.x - player.sprite.w;
+                        player.sprite.velocity.x = 0;
+                    } else {
+                        // Player hit obstacle from right side - block movement
+                        player.sprite.x = obstacle.x + obstacle.w;
+                        player.sprite.velocity.x = 0;
+                    }
+                    console.log('Player hit platform side at', obstacle.x, obstacle.y);
                 }
             }
         }
@@ -911,8 +972,14 @@ function checkCollisions() {
             player.sprite.y < spike.y + spike.h &&
             player.sprite.y + player.sprite.h > spike.y
         ) {
-            // Check if player is landing on top of spike
-            if (player.sprite.y + player.sprite.h > spike.y && player.sprite.y < spike.y) {
+            // More strict check for landing on top of spike
+            let tolerance = 8; // 8 pixel tolerance for landing - more forgiving
+            let isFalling = player.sprite.velocity.y > 0;
+            let isCloseToTop = (player.sprite.y + player.sprite.h) - spike.y < tolerance;
+            let isAboveSpike = player.sprite.y < spike.y;
+            
+            if (isFalling && isCloseToTop && isAboveSpike) {
+                // Player is actually landing on top of the spike
                 player.sprite.y = spike.y - player.sprite.h;
                 player.sprite.velocity.y = 0;
                 player.onSpike = true; // Mark that player is on a spike
@@ -1065,7 +1132,19 @@ function updateUIHearts() {
     // Hearts system removed - function kept for compatibility
 }
 
-// Player class with improved physics
+// Debug function to check input status
+function debugInputStatus() {
+    console.log('=== INPUT DEBUG INFO ===');
+    console.log('Canvas element:', document.querySelector('#game-container canvas'));
+    console.log('Canvas focused:', document.querySelector('#game-container canvas') === document.activeElement);
+    console.log('Game state:', gameState);
+    console.log('Game paused:', gamePaused);
+    console.log('Player exists:', !!player);
+    console.log('Current keys pressed:', Object.keys(keyStates).filter(key => keyStates[key]));
+    console.log('========================');
+}
+
+// Player class with clean, smooth jump mechanics
 class Player {
     constructor(x, y) {
         console.log('Creating player at:', x, y);
@@ -1089,118 +1168,96 @@ class Player {
             };
         }
         
-        this.acceleration = 3.2; // Much higher ground acceleration
-        this.maxSpeed = 12; // Slightly slower top ground speed
-        this.jumpPower = 18; // Increased jump height for higher jumps
+        // Movement variables
+        this.acceleration = 3.2;
+        this.maxSpeed = 12;
         this.onGround = false;
-        this.onSpike = false; // Track if player is on a spike
-        this.justLanded = false; // Track if player just landed on a platform
+        this.onSpike = false;
+        this.justLanded = false;
         this.color = [100, 150, 255];
         this.isMoving = false;
         this.facingDirection = 1; // 1 for right, -1 for left
         
-        // Hollow Knight-style physics variables
-        this.coyoteTime = 0; // Frames after leaving ground where you can still jump
-        this.coyoteTimeMax = 6; // 6 frames of coyote time (0.1 seconds at 60fps)
-        this.jumpBufferTime = 0; // Frames to buffer jump input
-        this.jumpBufferMax = 3; // 3 frames of jump buffering
-        this.airAcceleration = 0.4; // Much lower air acceleration for less control in air
-        this.airMaxSpeed = 12; // Slightly slower top air speed
-        this.jumpCutoff = 0.6; // Jump height multiplier when releasing jump early
-        this.isJumping = false; // Track if currently jumping
-        this.jumpStartVelocity = 0; // Store initial jump velocity
+        // Jump system variables
+        this.jumpPower = 18;
+        this.doubleJumpPower = 16;
+        this.gravity = 0.8;
+        this.coyoteTime = 0;
+        this.coyoteTimeMax = 6;
         
-        // Double jump variables
-        this.hasDoubleJump = true; // Can perform double jump
-        this.hasUsedDoubleJump = false; // Track if double jump was used
-        this.doubleJumpPower = 16; // Slightly less powerful than first jump
+        // Jump state tracking
+        this.isJumping = false;
+        this.hasDoubleJump = true;
+        this.hasUsedDoubleJump = false;
+        this.jumpKeyPressed = false;
+        this.jumpKeyHeld = false;
         
-        // Dash variables - redesigned as teleport
-        this.dashDistance = 300; // 5 character widths (60 * 5 = 300 pixels)
+        // Dash variables
+        this.dashDistance = 300;
         this.isDashing = false;
         this.dashDirection = 0;
-        this.canDash = true; // Can dash once per landing
-        this.dashKeyPressed = false; // Track if dash key was pressed to prevent holding
-        this.dashCooldown = 0; // Brief cooldown after dash
-        this.dashCooldownMax = 5; // 5 frames of cooldown
-        
-
+        this.canDash = true;
+        this.dashKeyPressed = false;
+        this.dashCooldown = 0;
+        this.dashCooldownMax = 5;
+        this.dashFrames = 0;
+        this.dashFrameDuration = 12;
         
         // Attack system variables
         this.isAttacking = false;
         this.attackFrameCount = 0;
-        this.attackDuration = 8; // Frames the attack lasts
+        this.attackDuration = 8;
         this.attackCooldown = 0;
-        this.attackCooldownMax = 10; // Frames between attacks
-        this.attackRange = 60; // Attack range in pixels (increased)
-        this.attackKeyPressed = false; // Prevent holding attack key
+        this.attackCooldownMax = 10;
+        this.attackRange = 60;
+        this.attackKeyPressed = false;
         
+        // Visual effects
         this.dashTrailStart = null;
         this.dashTrailEnd = null;
         this.dashTrailTimer = 0;
-        this.dashTrailDuration = 12; // frames to show the line
-        
-        this.justBounced = false;
-        
-        this.dashStartX = 0;
-        this.dashTargetX = 0;
-        this.dashElapsed = 0;
-        this.dashDuration = 0.2; // seconds (was 0.3)
+        this.dashTrailDuration = 12;
+        this.doubleJumpEffectTimer = 0;
+        this.doubleJumpEffectDuration = 8;
         
         console.log('Player created successfully:', this.sprite);
-        console.log('Dash frames calculated:', this.dashFrames, 'frames');
     }
     
     update() {
-        let currentTime = millis();
-        
         // Check if player is moving
         this.isMoving = isKeyDownFor('left') || isKeyDownFor('right');
         
-        // Handle dash input (E key) - teleport activation
+        // Handle dash input
         if (isKeyDownFor('dash')) {
             if (!this.dashKeyPressed && !this.isDashing && this.canDash && this.dashCooldown <= 0) {
                 this.startDash();
                 this.dashKeyPressed = true;
             }
         } else {
-            this.dashKeyPressed = false; // Reset when key is released
+            this.dashKeyPressed = false;
         }
         
-        // Handle attack input (J key) - 4 directional attacks
+        // Handle attack input
         if (isKeyDownFor('attack') && !gamePaused) {
             if (!this.attackKeyPressed && !this.isAttacking && this.attackCooldown <= 0) {
                 this.startAttack();
                 this.attackKeyPressed = true;
             }
         } else {
-            this.attackKeyPressed = false; // Reset when key is released
+            this.attackKeyPressed = false;
         }
         
-        // Update dash state - smooth
+        // Update dash state
         if (this.isDashing) {
-            // Calculate dash progress
-            let dashSpeed = this.dashDistance / (this.dashDuration * 60); // px per frame at 60fps
+            let dashSpeed = this.dashDistance / this.dashFrameDuration;
             let nextX = this.sprite.x + this.dashDirection * dashSpeed;
-            // If overshooting, clamp to target
-            if ((this.dashDirection > 0 && nextX >= this.dashTargetX) || (this.dashDirection < 0 && nextX <= this.dashTargetX)) {
-                this.sprite.x = this.dashTargetX;
+            if (nextX < 0) nextX = 0;
+            if (nextX + this.sprite.w > width) nextX = width - this.sprite.w;
+            this.sprite.x = nextX;
+            this.dashFrames++;
+            if (this.dashFrames >= this.dashFrameDuration) {
                 this.isDashing = false;
                 this.dashCooldown = this.dashCooldownMax;
-                this.canDash = false;
-                // Record dash end position and start timer for trail
-                this.dashTrailEnd = { x: this.sprite.x, y: this.sprite.y + this.sprite.h / 2 };
-                this.dashTrailTimer = this.dashTrailDuration;
-                this.dashTrailStart = this.dashTrailStart; // keep for effect
-                return;
-            } else {
-                this.sprite.x = nextX;
-                // Record dash trail start if not set
-                if (!this.dashTrailStart) {
-                    this.dashTrailStart = { x: this.dashStartX, y: this.sprite.y + this.sprite.h / 2 };
-                }
-                // No other movement during dash
-                return;
             }
         }
         
@@ -1217,104 +1274,77 @@ class Player {
                 this.attackCooldown = this.attackCooldownMax;
             }
         } else {
-            // Update attack cooldown
             if (this.attackCooldown > 0) {
                 this.attackCooldown--;
             }
         }
         
-
-        
         // Update coyote time
         if (this.onGround || this.onSpike) {
             this.coyoteTime = this.coyoteTimeMax;
-            // Reset double jump when touching ground
             this.hasDoubleJump = true;
             this.hasUsedDoubleJump = false;
         } else {
             this.coyoteTime = Math.max(0, this.coyoteTime - 1);
         }
         
-        // Update jump buffer
-        if (isKeyDownFor('jump')) {
-            this.jumpBufferTime = this.jumpBufferMax;
-        } else {
-            this.jumpBufferTime = Math.max(0, this.jumpBufferTime - 1);
-        }
+        // Handle jump input - clean jump system
+        let jumpKeyDown = isKeyDownFor('jump');
         
-        // Hollow Knight-style jumping with double jump
-        let canJump = (this.onGround || this.onSpike || this.coyoteTime > 0);
-        let canDoubleJump = !this.onGround && !this.onSpike && this.hasDoubleJump && !this.hasUsedDoubleJump;
-        
-        // First jump (ground jump)
-        if (this.jumpBufferTime > 0 && canJump && !this.isDashing) {
-            this.sprite.velocity.y = -this.jumpPower;
-            this.jumpStartVelocity = this.sprite.velocity.y;
-            this.onGround = false;
-            this.onSpike = false;
-            this.coyoteTime = 0; // Use up coyote time
-            this.jumpBufferTime = 0; // Use up jump buffer
-            this.isJumping = true;
-            // Play jump sound
-            playSound(jumpSound);
-        }
-        // Double jump (air jump)
-        else if (this.jumpBufferTime > 0 && canDoubleJump && !this.isDashing) {
-            this.sprite.velocity.y = -this.doubleJumpPower;
-            this.jumpStartVelocity = this.sprite.velocity.y;
-            this.jumpBufferTime = 0; // Use up jump buffer
-            this.isJumping = true;
-            this.hasUsedDoubleJump = true; // Mark double jump as used
-            // Play jump sound
-            playSound(jumpSound);
-        }
-        
-        // Variable jump height (cut jump short if button released)
-        if (this.isJumping && this.sprite.velocity.y < 0) {
-            if (!isKeyDownFor('jump')) {
-                this.sprite.velocity.y *= this.jumpCutoff;
-                this.isJumping = false;
+        if (jumpKeyDown) {
+            // Ground jump or coyote time jump
+            if ((this.onGround || this.onSpike || this.coyoteTime > 0) && !this.jumpKeyPressed && !this.isDashing) {
+                this.sprite.velocity.y = -this.jumpPower;
+                this.onGround = false;
+                this.onSpike = false;
+                this.coyoteTime = 0;
+                this.isJumping = true;
+                this.jumpKeyPressed = true;
+                this.jumpKeyHeld = true;
+                playSound(jumpSound);
+                console.log('Ground jump executed');
             }
+            // Double jump (only when pressing jump in mid-air, not holding)
+            else if (!this.onGround && !this.onSpike && this.hasDoubleJump && !this.hasUsedDoubleJump && !this.isDashing && !this.jumpKeyHeld) {
+                this.sprite.velocity.y = -this.doubleJumpPower;
+                this.isJumping = true;
+                this.hasUsedDoubleJump = true;
+                this.jumpKeyPressed = true;
+                playSound(jumpSound);
+                this.doubleJumpEffectTimer = this.doubleJumpEffectDuration;
+                console.log('Double jump executed');
+            }
+        } else {
+            // Reset jump key states when key is released
+            this.jumpKeyPressed = false;
+            this.jumpKeyHeld = false;
         }
         
         // Apply gravity
-        if (!this.onGround) {
-            this.sprite.velocity.y += 0.8; // Slightly stronger gravity for snappier feel
+        if (!this.onGround && !this.onSpike) {
+            this.sprite.velocity.y += this.gravity;
         }
         
-        // Hollow Knight-style movement with different air/ground physics
-        let currentAcceleration = this.onGround ? this.acceleration : this.airAcceleration;
-        let currentMaxSpeed = this.maxSpeed; // Cap air speed to ground speed
-        
-        // Reset horizontal momentum when just landed on a platform
-        if (this.justLanded) {
-            // this.sprite.velocity.x = 0; // Do not reset horizontal speed on landing
-            this.justLanded = false;
-        }
-        
+        // Handle movement
         if (isKeyDownFor('left')) {
-            this.sprite.velocity.x -= currentAcceleration;
-            if (this.sprite.velocity.x < -currentMaxSpeed) {
-                this.sprite.velocity.x = -currentMaxSpeed;
+            this.sprite.velocity.x -= this.acceleration;
+            if (this.sprite.velocity.x < -this.maxSpeed) {
+                this.sprite.velocity.x = -this.maxSpeed;
             }
             this.facingDirection = -1;
         } else if (isKeyDownFor('right')) {
-            this.sprite.velocity.x += currentAcceleration;
-            if (this.sprite.velocity.x > currentMaxSpeed) {
-                this.sprite.velocity.x = currentMaxSpeed;
+            this.sprite.velocity.x += this.acceleration;
+            if (this.sprite.velocity.x > this.maxSpeed) {
+                this.sprite.velocity.x = this.maxSpeed;
             }
             this.facingDirection = 1;
         } else {
             // Apply friction when no keys are pressed
             this.sprite.velocity.x *= this.sprite.friction;
-            // Stop completely if velocity is very small
             if (Math.abs(this.sprite.velocity.x) < 0.1) {
                 this.sprite.velocity.x = 0;
             }
         }
-        // Clamp horizontal velocity to maxSpeed in all cases
-        if (this.sprite.velocity.x > this.maxSpeed) this.sprite.velocity.x = this.maxSpeed;
-        if (this.sprite.velocity.x < -this.maxSpeed) this.sprite.velocity.x = -this.maxSpeed;
         
         // Update position manually if not using p5.play
         if (!this.sprite.update) {
@@ -1332,7 +1362,7 @@ class Player {
             this.sprite.velocity.x = 0;
         }
         
-        // Decrement dash trail timer
+        // Update visual effects
         if (this.dashTrailTimer > 0) {
             this.dashTrailTimer--;
             if (this.dashTrailTimer === 0) {
@@ -1340,6 +1370,13 @@ class Player {
                 this.dashTrailEnd = null;
             }
         }
+        
+        if (this.doubleJumpEffectTimer > 0) {
+            this.doubleJumpEffectTimer--;
+        }
+        
+        // Update double jump UI indicator
+        this.updateDoubleJumpIndicator();
     }
     
     startDash() {
@@ -1358,7 +1395,8 @@ class Player {
         if (this.dashTargetX < 0) this.dashTargetX = 0;
         if (this.dashTargetX + this.sprite.w > width) this.dashTargetX = width - this.sprite.w;
         this.dashElapsed = 0;
-        console.log('Smooth dash started! Direction:', this.dashDirection, 'Distance:', this.dashDistance);
+        this.dashFrames = 0; // Reset frame counter
+        console.log('Smooth dash started! Direction:', this.dashDirection, 'Distance:', this.dashDistance, 'Start X:', this.sprite.x, 'Target X:', this.dashTargetX);
     }
     
 
@@ -1485,6 +1523,11 @@ class Player {
         if (this.isAttacking) {
             this.drawAttackEffect();
         }
+        
+        // Draw double jump effect
+        if (this.doubleJumpEffectTimer > 0) {
+            this.showDoubleJumpEffect();
+        }
     }
     
     drawDashEffect() {
@@ -1551,6 +1594,41 @@ class Player {
         fill(0);
         ellipse(this.sprite.x + 12, this.sprite.y + 15, 4, 4);
         ellipse(this.sprite.x + 28, this.sprite.y + 15, 4, 4);
+    }
+    
+    showDoubleJumpEffect() {
+        // Create a brief visual effect for double jump
+        push();
+        stroke(255, 255, 0, 150); // Yellow with transparency
+        strokeWeight(4);
+        noFill();
+        // Draw expanding circles around the player
+        let centerX = this.sprite.x + this.sprite.w / 2;
+        let centerY = this.sprite.y + this.sprite.h / 2;
+        for (let i = 0; i < 3; i++) {
+            let radius = 30 + i * 15;
+            ellipse(centerX, centerY, radius, radius);
+        }
+        pop();
+    }
+    
+    updateDoubleJumpIndicator() {
+        try {
+            const indicator = document.getElementById('double-jump-indicator');
+            if (!indicator) {
+                console.log('Double jump indicator not found');
+                return;
+            }
+            
+            // Show indicator when double jump is available and player is in air
+            if (!this.onGround && !this.onSpike && this.hasDoubleJump && !this.hasUsedDoubleJump && !this.isDashing) {
+                indicator.classList.remove('hidden');
+            } else {
+                indicator.classList.add('hidden');
+            }
+        } catch (error) {
+            console.log('Error updating double jump indicator:', error);
+        }
     }
 }
 
@@ -1645,12 +1723,16 @@ function resetGame() {
     whiteEnemies = [];
     timeSurvived = 0;
     spawnTimer = 0;
-    currentScreen = 0; // Start with spikes screen
+    currentLevel = 1; // Start at level 1
+    currentScreen = 0; // Start at screen 0 of level 1
     screenTransitioned = false;
     screenStartTime = null;
 
-    // Place player on the ground
-    player = new Player(80, GROUND_Y - 75); // 75 = player height
+    // Get spawn point for current level and screen
+    const spawnPoint = getSpawnPointForLevel(currentLevel, currentScreen);
+    
+    // Place player at custom spawn point
+    player = new Player(spawnPoint.x, spawnPoint.y);
     // Reset dash state
     player.isDashing = false;
     player.canDash = true;
@@ -1660,8 +1742,10 @@ function resetGame() {
     player.dashTrailEnd = null;
     gameStartTime = null; // Will be set on first frame of playing
     
-    // Add initial enemies for the first screen
-    addInitialEnemiesForScreen();
+    // Add initial enemies for the current level and screen
+    addInitialEnemiesForLevel(currentLevel, currentScreen);
+    
+    console.log(`Reset game to Level ${currentLevel}, Screen ${currentScreen}`);
 }
 
 function resetCurrentScreen() {
@@ -1672,10 +1756,13 @@ function resetCurrentScreen() {
     obstacles = [];
     spikes = [];
     
-    // Reset player position to left side of current screen
+    // Get spawn point for current level and screen
+    const spawnPoint = getSpawnPointForLevel(currentLevel, currentScreen);
+    
+    // Reset player position to custom spawn point
     if (player) {
-        player.sprite.x = 80;
-        player.sprite.y = GROUND_Y - 75;
+        player.sprite.x = spawnPoint.x;
+        player.sprite.y = spawnPoint.y;
         player.sprite.velocity.x = 0;
         player.sprite.velocity.y = 0;
         // Reset dash state
@@ -1690,10 +1777,10 @@ function resetCurrentScreen() {
     // Reset spawn timer
     spawnTimer = 0;
     
-    // Add initial enemies for the current screen
-    addInitialEnemiesForScreen();
+    // Add initial enemies for the current level and screen
+    addInitialEnemiesForLevel(currentLevel, currentScreen);
     
-    console.log('Screen reset for screen:', currentScreen);
+    console.log('Screen reset for level:', currentLevel, 'screen:', currentScreen);
 }
 
 function updateUIScore() {
@@ -1703,10 +1790,10 @@ function updateUIScore() {
     }
     
     // Update screen information in UI
-    const screenInfo = getScreenInfo();
+    const levelInfo = getLevelInfo();
     let levelElem = document.getElementById('level');
     if (levelElem) {
-        levelElem.innerHTML = `Level ${currentLevel} - Screen ${screenInfo.current + 1}/4: ${screenInfo.name} | Time: <span id="level-value">${timeSurvived.toFixed(2)}</span>`;
+        levelElem.innerHTML = `Level ${currentLevel} - Screen ${currentScreen + 1}/4: ${levelInfo.screenName} | Time: <span id="level-value">${timeSurvived.toFixed(2)}</span>`;
     }
 }
 
@@ -2191,70 +2278,221 @@ function spawnRandomEnemy() {
 const LEVEL_CONFIGS = {
     1: {
         name: "Tutorial",
+        theme: "Learning the basics",
         screens: {
-            0: { name: "Spikes", spawnFunction: spawnLevel1Screen0 },
-            1: { name: "Yellow Enemies", spawnFunction: spawnLevel1Screen1 },
-            2: { name: "Blue Enemies", spawnFunction: spawnLevel1Screen2 },
-            3: { name: "White Enemies", spawnFunction: spawnLevel1Screen3 }
+            0: { 
+                name: "Platforms", 
+                type: "introduction",
+                spawnFunction: spawnLevel1Screen0,
+                spawnPoint: { x: 150, y: GROUND_Y - 195 },
+                description: "Learn basic platforming"
+            },
+            1: { 
+                name: "Yellow Enemies", 
+                type: "practice",
+                spawnFunction: spawnLevel1Screen1,
+                spawnPoint: { x: 120, y: GROUND_Y - 175 },
+                description: "Practice with ground enemies"
+            },
+            2: { 
+                name: "Blue Enemies", 
+                type: "mastery",
+                spawnFunction: spawnLevel1Screen2,
+                spawnPoint: { x: 100, y: GROUND_Y - 185 },
+                description: "Master flying enemies"
+            },
+            3: { 
+                name: "White Enemies", 
+                type: "challenge",
+                spawnFunction: spawnLevel1Screen3,
+                spawnPoint: { x: 130, y: GROUND_Y - 195 },
+                description: "Combine all enemy types"
+            }
         }
     },
     2: {
         name: "Beginner",
+        theme: "Platforming fundamentals",
         screens: {
-            0: { name: "Empty", spawnFunction: spawnLevel2Screen0 },
-            1: { name: "Empty", spawnFunction: spawnLevel2Screen1 },
-            2: { name: "Empty", spawnFunction: spawnLevel2Screen2 },
-            3: { name: "Empty", spawnFunction: spawnLevel2Screen3 }
+            0: { 
+                name: "Gap Jumping", 
+                type: "introduction",
+                spawnFunction: spawnLevel2Screen0, 
+                spawnPoint: { x: 140, y: GROUND_Y - 205 },
+                description: "Learn to jump between platforms"
+            },
+            1: { 
+                name: "Enemy Timing", 
+                type: "practice",
+                spawnFunction: spawnLevel2Screen1, 
+                spawnPoint: { x: 110, y: GROUND_Y - 215 },
+                description: "Time your jumps with enemies"
+            },
+            2: { 
+                name: "Mixed Threats", 
+                type: "mastery",
+                spawnFunction: spawnLevel2Screen2, 
+                spawnPoint: { x: 160, y: GROUND_Y - 225 },
+                description: "Handle multiple enemy types"
+            },
+            3: { 
+                name: "Speed Challenge", 
+                type: "challenge",
+                spawnFunction: spawnLevel2Screen3, 
+                spawnPoint: { x: 125, y: GROUND_Y - 235 },
+                description: "Quick reactions required"
+            }
         }
     },
     3: {
-        name: "Intermediate",
+        name: "Intermediate", 
+        theme: "Precision and timing",
         screens: {
-            0: { name: "Empty", spawnFunction: spawnLevel3Screen0 },
-            1: { name: "Empty", spawnFunction: spawnLevel3Screen1 },
-            2: { name: "Empty", spawnFunction: spawnLevel3Screen2 },
-            3: { name: "Empty", spawnFunction: spawnLevel3Screen3 }
+            0: { 
+                name: "Precision Jumps", 
+                type: "introduction",
+                spawnFunction: spawnLevel3Screen0, 
+                spawnPoint: { x: 150, y: GROUND_Y - 245 },
+                description: "Small platforms require precision"
+            },
+            1: { 
+                name: "Enemy Waves", 
+                type: "practice",
+                spawnFunction: spawnLevel3Screen1, 
+                spawnPoint: { x: 135, y: GROUND_Y - 255 },
+                description: "Handle waves of enemies"
+            },
+            2: { 
+                name: "Aerial Combat", 
+                type: "mastery",
+                spawnFunction: spawnLevel3Screen2, 
+                spawnPoint: { x: 145, y: GROUND_Y - 265 },
+                description: "Fight while airborne"
+            },
+            3: { 
+                name: "Chaos Control", 
+                type: "challenge",
+                spawnFunction: spawnLevel3Screen3, 
+                spawnPoint: { x: 155, y: GROUND_Y - 275 },
+                description: "Control the chaos"
+            }
         }
     },
     4: {
         name: "Advanced",
+        theme: "Complex challenges",
         screens: {
-            0: { name: "Empty", spawnFunction: spawnLevel4Screen0 },
-            1: { name: "Empty", spawnFunction: spawnLevel4Screen1 },
-            2: { name: "Empty", spawnFunction: spawnLevel4Screen2 },
-            3: { name: "Empty", spawnFunction: spawnLevel4Screen3 }
+            0: { 
+                name: "Advanced Platforms", 
+                type: "introduction",
+                spawnFunction: spawnLevel4Screen0, 
+                spawnPoint: { x: 160, y: GROUND_Y - 285 },
+                description: "Complex platforming sequences"
+            },
+            1: { 
+                name: "Enemy Swarms", 
+                type: "practice",
+                spawnFunction: spawnLevel4Screen1, 
+                spawnPoint: { x: 140, y: GROUND_Y - 295 },
+                description: "Handle large groups of enemies"
+            },
+            2: { 
+                name: "Precision Combat", 
+                type: "mastery",
+                spawnFunction: spawnLevel4Screen2, 
+                spawnPoint: { x: 150, y: GROUND_Y - 305 },
+                description: "Fight with precision timing"
+            },
+            3: { 
+                name: "Ultimate Challenge", 
+                type: "challenge",
+                spawnFunction: spawnLevel4Screen3, 
+                spawnPoint: { x: 145, y: GROUND_Y - 315 },
+                description: "The ultimate test of skill"
+            }
         }
     },
     5: {
         name: "Expert",
+        theme: "Master level gameplay",
         screens: {
-            0: { name: "Empty", spawnFunction: spawnLevel5Screen0 },
-            1: { name: "Empty", spawnFunction: spawnLevel5Screen1 },
-            2: { name: "Empty", spawnFunction: spawnLevel5Screen2 },
-            3: { name: "Empty", spawnFunction: spawnLevel5Screen3 }
+            0: { 
+                name: "Expert Platforms", 
+                type: "introduction",
+                spawnFunction: spawnLevel5Screen0, 
+                spawnPoint: { x: 170, y: GROUND_Y - 325 },
+                description: "Expert-level platforming"
+            },
+            1: { 
+                name: "Elite Enemies", 
+                type: "practice",
+                spawnFunction: spawnLevel5Screen1, 
+                spawnPoint: { x: 155, y: GROUND_Y - 335 },
+                description: "Face elite enemy types"
+            },
+            2: { 
+                name: "Master Combat", 
+                type: "mastery",
+                spawnFunction: spawnLevel5Screen2, 
+                spawnPoint: { x: 165, y: GROUND_Y - 345 },
+                description: "Master-level combat scenarios"
+            },
+            3: { 
+                name: "Legendary Challenge", 
+                type: "challenge",
+                spawnFunction: spawnLevel5Screen3, 
+                spawnPoint: { x: 160, y: GROUND_Y - 355 },
+                description: "Legendary difficulty challenge"
+            }
         }
     },
     6: {
         name: "Master",
+        theme: "Ultimate mastery",
         screens: {
-            0: { name: "Empty", spawnFunction: spawnLevel6Screen0 },
-            1: { name: "Empty", spawnFunction: spawnLevel6Screen1 },
-            2: { name: "Empty", spawnFunction: spawnLevel6Screen2 },
-            3: { name: "Empty", spawnFunction: spawnLevel6Screen3 }
+            0: { 
+                name: "Master Platforms", 
+                type: "introduction",
+                spawnFunction: spawnLevel6Screen0, 
+                spawnPoint: { x: 180, y: GROUND_Y - 365 },
+                description: "Master-level platforming"
+            },
+            1: { 
+                name: "Master Enemies", 
+                type: "practice",
+                spawnFunction: spawnLevel6Screen1, 
+                spawnPoint: { x: 170, y: GROUND_Y - 375 },
+                description: "Master-level enemy encounters"
+            },
+            2: { 
+                name: "Ultimate Combat", 
+                type: "mastery",
+                spawnFunction: spawnLevel6Screen2, 
+                spawnPoint: { x: 175, y: GROUND_Y - 385 },
+                description: "Ultimate combat scenarios"
+            },
+            3: { 
+                name: "Final Challenge", 
+                type: "challenge",
+                spawnFunction: spawnLevel6Screen3, 
+                spawnPoint: { x: 165, y: GROUND_Y - 395 },
+                description: "The final challenge"
+            }
         }
     }
 };
 
+
+
 function spawnScreenSpecificEnemy() {
-    const levelConfig = LEVEL_CONFIGS[currentLevel];
-    if (!levelConfig || !levelConfig.screens[currentScreen]) {
-        return; // No configuration for this level/screen
-    }
-    
-    // Call the specific spawn function for this level and screen
-    const spawnFunction = levelConfig.screens[currentScreen].spawnFunction;
-    if (spawnFunction) {
-        spawnFunction();
+    // Call the appropriate spawn function based on level and screen
+    if (LEVEL_CONFIGS[currentLevel] && LEVEL_CONFIGS[currentLevel].screens[currentScreen]) {
+        const spawnFunction = LEVEL_CONFIGS[currentLevel].screens[currentScreen].spawnFunction;
+        if (spawnFunction) {
+            spawnFunction();
+        }
+    } else {
+        console.log('No spawn function for level:', currentLevel, 'screen:', currentScreen);
     }
 }
 
@@ -2339,37 +2577,548 @@ function spawnLevel1Screen3() {
     }
 }
 
-// --- LEVEL 2-6 SPAWN FUNCTIONS (EMPTY FOR NOW) ---
-function spawnLevel2Screen0() { /* Empty screen */ }
-function spawnLevel2Screen1() { /* Empty screen */ }
-function spawnLevel2Screen2() { /* Empty screen */ }
-function spawnLevel2Screen3() { /* Empty screen */ }
+// --- LEVEL 2 SPAWN FUNCTIONS (BEGINNER) ---
+function spawnLevel2Screen0() {
+    // Gap jumping introduction - safe gaps with clear landing spots
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let spikeX = spawnSide === 'left' ? -30 : width + 30;
+    let spike = new Spike(spikeX, GROUND_Y - 30, 30, 30);
+    spike.speed = spawnSide === 'left' ? 1.2 : -1.2; // Slower for beginners
+    spikes.push(spike);
+    console.log('Level 2 Screen 0: Spawned spike at:', spikeX);
+}
 
-function spawnLevel3Screen0() { /* Empty screen */ }
-function spawnLevel3Screen1() { /* Empty screen */ }
-function spawnLevel3Screen2() { /* Empty screen */ }
-function spawnLevel3Screen3() { /* Empty screen */ }
+function spawnLevel2Screen1() {
+    // Enemy timing - predictable patterns
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 0 : width - w;
+    
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 1.8 : -1.8; // Moderate speed
+        let enemy = new Enemy(x, y, w, w);
+        enemy.speed = speed;
+        enemies.push(enemy);
+        console.log('Level 2 Screen 1: Spawned yellow enemy at:', x, 'speed:', speed);
+    }
+    
+    // Add a second enemy with opposite direction for timing practice
+    if (Math.random() < 0.7) {
+        let secondX = spawnSide === 'left' ? width - w : 0;
+        if (!isPositionTooClose(secondX, y, w, w)) {
+            let secondSpeed = spawnSide === 'left' ? -1.8 : 1.8;
+            let secondEnemy = new Enemy(secondX, y, w, w);
+            secondEnemy.speed = secondSpeed;
+            enemies.push(secondEnemy);
+            console.log('Level 2 Screen 1: Spawned second yellow enemy at:', secondX, 'speed:', secondSpeed);
+        }
+    }
+}
 
-function spawnLevel4Screen0() { /* Empty screen */ }
-function spawnLevel4Screen1() { /* Empty screen */ }
-function spawnLevel4Screen2() { /* Empty screen */ }
-function spawnLevel4Screen3() { /* Empty screen */ }
+function spawnLevel2Screen2() {
+    // Mixed threats - yellow and white enemies
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    
+    // Yellow enemy
+    let yellowX = spawnSide === 'left' ? 0 : width - w;
+    if (!isPositionTooClose(yellowX, y, w, w)) {
+        let yellowSpeed = spawnSide === 'left' ? 1.5 : -1.5;
+        let yellowEnemy = new Enemy(yellowX, y, w, w);
+        yellowEnemy.speed = yellowSpeed;
+        enemies.push(yellowEnemy);
+        console.log('Level 2 Screen 2: Spawned yellow enemy at:', yellowX, 'speed:', yellowSpeed);
+    }
+    
+    // White enemy (50% chance)
+    if (Math.random() < 0.5) {
+        let whiteX = spawnSide === 'left' ? width - w - 100 : 100;
+        if (!isPositionTooClose(whiteX, y, w, w)) {
+            let whiteSpeed = spawnSide === 'left' ? -1.2 : 1.2;
+            let whiteEnemy = new WhiteEnemy(whiteX, y, w, w);
+            whiteEnemy.speed = whiteSpeed;
+            whiteEnemies.push(whiteEnemy);
+            console.log('Level 2 Screen 2: Spawned white enemy at:', whiteX, 'speed:', whiteSpeed);
+        }
+    }
+}
 
-function spawnLevel5Screen0() { /* Empty screen */ }
-function spawnLevel5Screen1() { /* Empty screen */ }
-function spawnLevel5Screen2() { /* Empty screen */ }
-function spawnLevel5Screen3() { /* Empty screen */ }
+function spawnLevel2Screen3() {
+    // Speed challenge - faster enemies but fewer
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 0 : width - w;
+    
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 2.2 : -2.2; // Faster for challenge
+        let enemy = new Enemy(x, y, w, w);
+        enemy.speed = speed;
+        enemies.push(enemy);
+        console.log('Level 2 Screen 3: Spawned fast yellow enemy at:', x, 'speed:', speed);
+    }
+}
 
-function spawnLevel6Screen0() { /* Empty screen */ }
-function spawnLevel6Screen1() { /* Empty screen */ }
-function spawnLevel6Screen2() { /* Empty screen */ }
-function spawnLevel6Screen3() { /* Empty screen */ }
+// --- LEVEL 3 SPAWN FUNCTIONS (INTERMEDIATE) ---
+function spawnLevel3Screen0() {
+    // Precision jumps - smaller platforms, more precise timing
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let spikeX = spawnSide === 'left' ? -30 : width + 30;
+    let spike = new Spike(spikeX, GROUND_Y - 30, 30, 30);
+    spike.speed = spawnSide === 'left' ? 1.8 : -1.8; // Faster than level 2
+    spikes.push(spike);
+    console.log('Level 3 Screen 0: Spawned spike at:', spikeX);
+}
+
+function spawnLevel3Screen1() {
+    // Enemy waves - multiple enemies in patterns
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    
+    // Create a wave of 3 enemies
+    for (let i = 0; i < 3; i++) {
+        let x = spawnSide === 'left' ? i * 200 : width - w - (i * 200);
+        if (!isPositionTooClose(x, y, w, w)) {
+            let speed = spawnSide === 'left' ? 2.0 : -2.0;
+            let enemy = new Enemy(x, y, w, w);
+            enemy.speed = speed;
+            enemies.push(enemy);
+            console.log('Level 3 Screen 1: Spawned wave enemy', i, 'at:', x, 'speed:', speed);
+        }
+    }
+}
+
+function spawnLevel3Screen2() {
+    // Aerial combat - flying enemies with ground enemies
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let groundY = GROUND_Y - w;
+    
+    // Ground enemy
+    let groundX = spawnSide === 'left' ? 0 : width - w;
+    if (!isPositionTooClose(groundX, groundY, w, w)) {
+        let groundSpeed = spawnSide === 'left' ? 1.8 : -1.8;
+        let groundEnemy = new Enemy(groundX, groundY, w, w);
+        groundEnemy.speed = groundSpeed;
+        enemies.push(groundEnemy);
+        console.log('Level 3 Screen 2: Spawned ground enemy at:', groundX, 'speed:', groundSpeed);
+    }
+    
+    // Flying enemy
+    let flyingW = 45;
+    let flyingY = GROUND_Y - 120;
+    let flyingX = spawnSide === 'left' ? 300 : width - flyingW - 300;
+    if (!isPositionTooClose(flyingX, flyingY, flyingW, flyingW)) {
+        let flyingSpeed = spawnSide === 'left' ? 1.5 : -1.5;
+        let flyingEnemy = new FlyingEnemy(flyingX, flyingY, flyingW, flyingW);
+        flyingEnemy.speed = flyingSpeed;
+        flyingEnemies.push(flyingEnemy);
+        console.log('Level 3 Screen 2: Spawned flying enemy at:', flyingX, flyingY, 'speed:', flyingSpeed);
+    }
+}
+
+function spawnLevel3Screen3() {
+    // Chaos control - multiple enemy types
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    
+    // Yellow enemy
+    let yellowX = spawnSide === 'left' ? 0 : width - w;
+    if (!isPositionTooClose(yellowX, y, w, w)) {
+        let yellowSpeed = spawnSide === 'left' ? 2.0 : -2.0;
+        let yellowEnemy = new Enemy(yellowX, y, w, w);
+        yellowEnemy.speed = yellowSpeed;
+        enemies.push(yellowEnemy);
+        console.log('Level 3 Screen 3: Spawned yellow enemy at:', yellowX, 'speed:', yellowSpeed);
+    }
+    
+    // White enemy
+    let whiteX = spawnSide === 'left' ? width - w - 150 : 150;
+    if (!isPositionTooClose(whiteX, y, w, w)) {
+        let whiteSpeed = spawnSide === 'left' ? -1.8 : 1.8;
+        let whiteEnemy = new WhiteEnemy(whiteX, y, w, w);
+        whiteEnemy.speed = whiteSpeed;
+        whiteEnemies.push(whiteEnemy);
+        console.log('Level 3 Screen 3: Spawned white enemy at:', whiteX, 'speed:', whiteSpeed);
+    }
+    
+    // Flying enemy (50% chance)
+    if (Math.random() < 0.5) {
+        let flyingW = 45;
+        let flyingY = GROUND_Y - 140;
+        let flyingX = spawnSide === 'left' ? 400 : width - flyingW - 400;
+        if (!isPositionTooClose(flyingX, flyingY, flyingW, flyingW)) {
+            let flyingSpeed = spawnSide === 'left' ? 1.6 : -1.6;
+            let flyingEnemy = new FlyingEnemy(flyingX, flyingY, flyingW, flyingW);
+            flyingEnemy.speed = flyingSpeed;
+            flyingEnemies.push(flyingEnemy);
+            console.log('Level 3 Screen 3: Spawned flying enemy at:', flyingX, flyingY, 'speed:', flyingSpeed);
+        }
+    }
+}
+
+// --- LEVEL 4 SPAWN FUNCTIONS ---
+function spawnLevel4Screen0() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 0 : width - w;
+    
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 2.5 : -2.5;
+        let enemy = new Enemy(x, y, w, w);
+        enemy.speed = speed;
+        enemies.push(enemy);
+        console.log('Level 4 Screen 0: Spawned yellow enemy at:', x, 'y:', y, 'speed:', speed);
+    }
+    
+    // Also spawn white enemies (75% chance)
+    if (Math.random() < 0.75) {
+        let whiteX = spawnSide === 'left' ? 50 : width - w - 50;
+        if (!isPositionTooClose(whiteX, y, w, w)) {
+            let whiteSpeed = spawnSide === 'left' ? 2 : -2;
+            let whiteEnemy = new WhiteEnemy(whiteX, y, w, w);
+            whiteEnemy.speed = whiteSpeed;
+            whiteEnemies.push(whiteEnemy);
+            console.log('Level 4 Screen 0: Spawned white enemy at:', whiteX, 'y:', y, 'speed:', whiteSpeed);
+        }
+    }
+}
+
+function spawnLevel4Screen1() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let flyingW = 45;
+    let minY = GROUND_Y - JUMP_HEIGHT + 10;
+    let maxY = GROUND_Y - flyingW;
+    let flyingY = Math.random() * (maxY - minY) + minY;
+    let flyingX = spawnSide === 'left' ? 0 : width - flyingW;
+    
+    if (!isPositionTooClose(flyingX, flyingY, flyingW, flyingW)) {
+        let speed = spawnSide === 'left' ? 2 : -2;
+        let flyingEnemy = new FlyingEnemy(flyingX, flyingY, flyingW, flyingW);
+        flyingEnemy.speed = speed;
+        flyingEnemies.push(flyingEnemy);
+        console.log('Level 4 Screen 1: Spawned flying enemy at:', flyingX, flyingY, 'speed:', speed);
+    }
+    
+    // Also spawn yellow enemies (75% chance)
+    if (Math.random() < 0.75) {
+        let w = 40;
+        let y = GROUND_Y - w;
+        let x = spawnSide === 'left' ? 50 : width - w - 50;
+        if (!isPositionTooClose(x, y, w, w)) {
+            let speed = spawnSide === 'left' ? 2.5 : -2.5;
+            let enemy = new Enemy(x, y, w, w);
+            enemy.speed = speed;
+            enemies.push(enemy);
+            console.log('Level 4 Screen 1: Spawned yellow enemy at:', x, 'y:', y, 'speed:', speed);
+        }
+    }
+}
+
+function spawnLevel4Screen2() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 0 : width - w;
+    
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 3 : -3;
+        let enemy = new WhiteEnemy(x, y, w, w);
+        enemy.speed = speed;
+        whiteEnemies.push(enemy);
+        console.log('Level 4 Screen 2: Spawned white enemy at:', x, 'y:', y, 'speed:', speed);
+    }
+    
+    // Also spawn flying enemies (75% chance)
+    if (Math.random() < 0.75) {
+        let flyingW = 45;
+        let minY = GROUND_Y - JUMP_HEIGHT + 10;
+        let maxY = GROUND_Y - flyingW;
+        let flyingY = Math.random() * (maxY - minY) + minY;
+        let flyingX = spawnSide === 'left' ? 0 : width - flyingW;
+        
+        if (!isPositionTooClose(flyingX, flyingY, flyingW, flyingW)) {
+            let speed = spawnSide === 'left' ? 2.5 : -2.5;
+            let flyingEnemy = new FlyingEnemy(flyingX, flyingY, flyingW, flyingW);
+            flyingEnemy.speed = speed;
+            flyingEnemies.push(flyingEnemy);
+            console.log('Level 4 Screen 2: Spawned flying enemy at:', flyingX, flyingY, 'speed:', speed);
+        }
+    }
+}
+
+function spawnLevel4Screen3() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 0 : width - w;
+    
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 3 : -3;
+        let enemy = new Enemy(x, y, w, w);
+        enemy.speed = speed;
+        enemies.push(enemy);
+        console.log('Level 4 Screen 3: Spawned yellow enemy at:', x, 'y:', y, 'speed:', speed);
+    }
+    
+    // Also spawn white enemies (75% chance)
+    if (Math.random() < 0.75) {
+        let whiteX = spawnSide === 'left' ? 50 : width - w - 50;
+        if (!isPositionTooClose(whiteX, y, w, w)) {
+            let whiteSpeed = spawnSide === 'left' ? 2.5 : -2.5;
+            let whiteEnemy = new WhiteEnemy(whiteX, y, w, w);
+            whiteEnemy.speed = whiteSpeed;
+            whiteEnemies.push(whiteEnemy);
+            console.log('Level 4 Screen 3: Spawned white enemy at:', whiteX, 'y:', y, 'speed:', whiteSpeed);
+        }
+    }
+}
+
+// --- LEVEL 5 SPAWN FUNCTIONS ---
+function spawnLevel5Screen0() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 0 : width - w;
+    
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 3.5 : -3.5;
+        let enemy = new Enemy(x, y, w, w);
+        enemy.speed = speed;
+        enemies.push(enemy);
+        console.log('Level 5 Screen 0: Spawned yellow enemy at:', x, 'y:', y, 'speed:', speed);
+    }
+    
+    // Also spawn white enemies (100% chance)
+    let whiteX = spawnSide === 'left' ? 50 : width - w - 50;
+    if (!isPositionTooClose(whiteX, y, w, w)) {
+        let whiteSpeed = spawnSide === 'left' ? 3 : -3;
+        let whiteEnemy = new WhiteEnemy(whiteX, y, w, w);
+        whiteEnemy.speed = whiteSpeed;
+        whiteEnemies.push(whiteEnemy);
+        console.log('Level 5 Screen 0: Spawned white enemy at:', whiteX, 'y:', y, 'speed:', whiteSpeed);
+    }
+}
+
+function spawnLevel5Screen1() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let flyingW = 45;
+    let minY = GROUND_Y - JUMP_HEIGHT + 10;
+    let maxY = GROUND_Y - flyingW;
+    let flyingY = Math.random() * (maxY - minY) + minY;
+    let flyingX = spawnSide === 'left' ? 0 : width - flyingW;
+    
+    if (!isPositionTooClose(flyingX, flyingY, flyingW, flyingW)) {
+        let speed = spawnSide === 'left' ? 3 : -3;
+        let flyingEnemy = new FlyingEnemy(flyingX, flyingY, flyingW, flyingW);
+        flyingEnemy.speed = speed;
+        flyingEnemies.push(flyingEnemy);
+        console.log('Level 5 Screen 1: Spawned flying enemy at:', flyingX, flyingY, 'speed:', speed);
+    }
+    
+    // Also spawn yellow enemies (100% chance)
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 50 : width - w - 50;
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 3.5 : -3.5;
+        let enemy = new Enemy(x, y, w, w);
+        enemy.speed = speed;
+        enemies.push(enemy);
+        console.log('Level 5 Screen 1: Spawned yellow enemy at:', x, 'y:', y, 'speed:', speed);
+    }
+}
+
+function spawnLevel5Screen2() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 0 : width - w;
+    
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 4 : -4;
+        let enemy = new WhiteEnemy(x, y, w, w);
+        enemy.speed = speed;
+        whiteEnemies.push(enemy);
+        console.log('Level 5 Screen 2: Spawned white enemy at:', x, 'y:', y, 'speed:', speed);
+    }
+    
+    // Also spawn flying enemies (100% chance)
+    let flyingW = 45;
+    let minY = GROUND_Y - JUMP_HEIGHT + 10;
+    let maxY = GROUND_Y - flyingW;
+    let flyingY = Math.random() * (maxY - minY) + minY;
+    let flyingX = spawnSide === 'left' ? 0 : width - flyingW;
+    
+    if (!isPositionTooClose(flyingX, flyingY, flyingW, flyingW)) {
+        let speed = spawnSide === 'left' ? 3.5 : -3.5;
+        let flyingEnemy = new FlyingEnemy(flyingX, flyingY, flyingW, flyingW);
+        flyingEnemy.speed = speed;
+        flyingEnemies.push(flyingEnemy);
+        console.log('Level 5 Screen 2: Spawned flying enemy at:', flyingX, flyingY, 'speed:', speed);
+    }
+}
+
+function spawnLevel5Screen3() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 0 : width - w;
+    
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 4 : -4;
+        let enemy = new Enemy(x, y, w, w);
+        enemy.speed = speed;
+        enemies.push(enemy);
+        console.log('Level 5 Screen 3: Spawned yellow enemy at:', x, 'y:', y, 'speed:', speed);
+    }
+    
+    // Also spawn white enemies (100% chance)
+    let whiteX = spawnSide === 'left' ? 50 : width - w - 50;
+    if (!isPositionTooClose(whiteX, y, w, w)) {
+        let whiteSpeed = spawnSide === 'left' ? 3.5 : -3.5;
+        let whiteEnemy = new WhiteEnemy(whiteX, y, w, w);
+        whiteEnemy.speed = whiteSpeed;
+        whiteEnemies.push(whiteEnemy);
+        console.log('Level 5 Screen 3: Spawned white enemy at:', whiteX, 'y:', y, 'speed:', whiteSpeed);
+    }
+}
+
+// --- LEVEL 6 SPAWN FUNCTIONS ---
+function spawnLevel6Screen0() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 0 : width - w;
+    
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 4.5 : -4.5;
+        let enemy = new Enemy(x, y, w, w);
+        enemy.speed = speed;
+        enemies.push(enemy);
+        console.log('Level 6 Screen 0: Spawned yellow enemy at:', x, 'y:', y, 'speed:', speed);
+    }
+    
+    // Also spawn white enemies (100% chance)
+    let whiteX = spawnSide === 'left' ? 50 : width - w - 50;
+    if (!isPositionTooClose(whiteX, y, w, w)) {
+        let whiteSpeed = spawnSide === 'left' ? 4 : -4;
+        let whiteEnemy = new WhiteEnemy(whiteX, y, w, w);
+        whiteEnemy.speed = whiteSpeed;
+        whiteEnemies.push(whiteEnemy);
+        console.log('Level 6 Screen 0: Spawned white enemy at:', whiteX, 'y:', y, 'speed:', whiteSpeed);
+    }
+}
+
+function spawnLevel6Screen1() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let flyingW = 45;
+    let minY = GROUND_Y - JUMP_HEIGHT + 10;
+    let maxY = GROUND_Y - flyingW;
+    let flyingY = Math.random() * (maxY - minY) + minY;
+    let flyingX = spawnSide === 'left' ? 0 : width - flyingW;
+    
+    if (!isPositionTooClose(flyingX, flyingY, flyingW, flyingW)) {
+        let speed = spawnSide === 'left' ? 4 : -4;
+        let flyingEnemy = new FlyingEnemy(flyingX, flyingY, flyingW, flyingW);
+        flyingEnemy.speed = speed;
+        flyingEnemies.push(flyingEnemy);
+        console.log('Level 6 Screen 1: Spawned flying enemy at:', flyingX, flyingY, 'speed:', speed);
+    }
+    
+    // Also spawn yellow enemies (100% chance)
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 50 : width - w - 50;
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 4.5 : -4.5;
+        let enemy = new Enemy(x, y, w, w);
+        enemy.speed = speed;
+        enemies.push(enemy);
+        console.log('Level 6 Screen 1: Spawned yellow enemy at:', x, 'y:', y, 'speed:', speed);
+    }
+}
+
+function spawnLevel6Screen2() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 0 : width - w;
+    
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 5 : -5;
+        let enemy = new WhiteEnemy(x, y, w, w);
+        enemy.speed = speed;
+        whiteEnemies.push(enemy);
+        console.log('Level 6 Screen 2: Spawned white enemy at:', x, 'y:', y, 'speed:', speed);
+    }
+    
+    // Also spawn flying enemies (100% chance)
+    let flyingW = 45;
+    let minY = GROUND_Y - JUMP_HEIGHT + 10;
+    let maxY = GROUND_Y - flyingW;
+    let flyingY = Math.random() * (maxY - minY) + minY;
+    let flyingX = spawnSide === 'left' ? 0 : width - flyingW;
+    
+    if (!isPositionTooClose(flyingX, flyingY, flyingW, flyingW)) {
+        let speed = spawnSide === 'left' ? 4.5 : -4.5;
+        let flyingEnemy = new FlyingEnemy(flyingX, flyingY, flyingW, flyingW);
+        flyingEnemy.speed = speed;
+        flyingEnemies.push(flyingEnemy);
+        console.log('Level 6 Screen 2: Spawned flying enemy at:', flyingX, flyingY, 'speed:', speed);
+    }
+}
+
+function spawnLevel6Screen3() {
+    let spawnSide = Math.random() < 0.5 ? 'left' : 'right';
+    let w = 40;
+    let y = GROUND_Y - w;
+    let x = spawnSide === 'left' ? 0 : width - w;
+    
+    if (!isPositionTooClose(x, y, w, w)) {
+        let speed = spawnSide === 'left' ? 5 : -5;
+        let enemy = new Enemy(x, y, w, w);
+        enemy.speed = speed;
+        enemies.push(enemy);
+        console.log('Level 6 Screen 3: Spawned yellow enemy at:', x, 'y:', y, 'speed:', speed);
+    }
+    
+    // Also spawn white enemies (100% chance)
+    let whiteX = spawnSide === 'left' ? 50 : width - w - 50;
+    if (!isPositionTooClose(whiteX, y, w, w)) {
+        let whiteSpeed = spawnSide === 'left' ? 4.5 : -4.5;
+        let whiteEnemy = new WhiteEnemy(whiteX, y, w, w);
+        whiteEnemy.speed = whiteSpeed;
+        whiteEnemies.push(whiteEnemy);
+        console.log('Level 6 Screen 3: Spawned white enemy at:', whiteX, 'y:', y, 'speed:', whiteSpeed);
+    }
+}
+
+
 
 function transitionToNextScreen() {
     if (screenTransitioned) return; // Prevent multiple transitions
     
     screenTransitioned = true;
     currentScreen++;
+    
+    // Check if we need to move to next level
+    if (currentScreen >= 4) {
+        currentLevel++;
+        currentScreen = 0;
+        
+        // Check if game is complete (all 6 levels finished)
+        if (currentLevel > 6) {
+            console.log('All 6 levels completed!');
+            showLevelComplete();
+            return;
+        }
+    }
     
     // Clear all enemies and obstacles for new screen
     enemies = [];
@@ -2378,10 +3127,13 @@ function transitionToNextScreen() {
     obstacles = [];
     spikes = [];
     
-    // Reset player position to left side of screen and stop any active dash
+    // Get spawn point for current level and screen
+    const spawnPoint = getSpawnPointForLevel(currentLevel, currentScreen);
+    
+    // Reset player position to custom spawn point and stop any active dash
     if (player) {
-        player.sprite.x = 80;
-        player.sprite.y = GROUND_Y - 75;
+        player.sprite.x = spawnPoint.x;
+        player.sprite.y = spawnPoint.y;
         player.sprite.velocity.x = 0;
         player.sprite.velocity.y = 0;
         
@@ -2401,17 +3153,10 @@ function transitionToNextScreen() {
     spawnTimer = 0;
     screenStartTime = millis();
     
-    console.log('Transitioned to screen:', currentScreen);
+    console.log('Transitioned to level:', currentLevel, 'screen:', currentScreen);
     
-    // Add initial enemies for the new screen
-    addInitialEnemiesForScreen();
-    
-    // Check if game is complete (all screens finished)
-    if (currentScreen >= 4) {
-        console.log('All screens completed!');
-        showLevelComplete();
-        return;
-    }
+    // Add initial enemies for the new level and screen
+    addInitialEnemiesForLevel(currentLevel, currentScreen);
     
     // Reset transition flag after a short delay
     setTimeout(() => {
@@ -2429,19 +3174,10 @@ function checkScreenTransition() {
 }
 
 function getScreenInfo() {
-    const levelConfig = LEVEL_CONFIGS[currentLevel];
-    if (!levelConfig || !levelConfig.screens[currentScreen]) {
-        return {
-            current: currentScreen,
-            name: 'Unknown',
-            total: 4
-        };
-    }
-    
     return {
         current: currentScreen,
-        name: levelConfig.screens[currentScreen].name,
-        total: 4
+        name: getScreenName(currentScreen),
+        total: 12
     };
 }
 
@@ -2486,30 +3222,52 @@ const INITIAL_ENEMY_CONFIGS = {
 };
 
 function addInitialEnemiesForScreen() {
-    const levelConfig = INITIAL_ENEMY_CONFIGS[currentLevel];
-    if (!levelConfig || !levelConfig[currentScreen]) {
-        return; // No configuration for this level/screen
-    }
-    
-    // Call the specific initial enemy function for this level and screen
-    const initialFunction = levelConfig[currentScreen];
-    if (initialFunction) {
-        initialFunction();
+    // Call the appropriate function based on level and screen
+    if (INITIAL_ENEMY_CONFIGS[currentLevel] && INITIAL_ENEMY_CONFIGS[currentLevel][currentScreen]) {
+        INITIAL_ENEMY_CONFIGS[currentLevel][currentScreen]();
+    } else {
+        console.log('No initial enemies for level:', currentLevel, 'screen:', currentScreen);
     }
 }
 
 // --- LEVEL 1 INITIAL ENEMY FUNCTIONS ---
 function addInitialLevel1Screen0() {
-    // Add 2-3 spikes at different positions
-    for (let i = 0; i < 3; i++) {
-        let x = 300 + i * 200; // Spread spikes across the screen
-        let spike = new Spike(x, GROUND_Y - 30, 30, 30);
-        spike.speed = 0; // Stationary spikes
-        spikes.push(spike);
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 150, y: GROUND_Y - 120, w: 100, h: 20},
+        {x: 350, y: GROUND_Y - 150, w: 80, h: 20},
+        {x: 550, y: GROUND_Y - 180, w: 120, h: 20},
+        {x: 750, y: GROUND_Y - 140, w: 90, h: 20},
+        {x: 950, y: GROUND_Y - 160, w: 100, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
     }
+    
+    console.log('Level 1 Screen 0: Added', obstacles.length, 'platforms');
 }
 
 function addInitialLevel1Screen1() {
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 120, y: GROUND_Y - 100, w: 80, h: 20},
+        {x: 300, y: GROUND_Y - 130, w: 90, h: 20},
+        {x: 500, y: GROUND_Y - 160, w: 100, h: 20},
+        {x: 700, y: GROUND_Y - 140, w: 85, h: 20},
+        {x: 900, y: GROUND_Y - 120, w: 95, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+    
     // Add 2-3 yellow enemies
     for (let i = 0; i < 3; i++) {
         let x = 400 + i * 150;
@@ -2529,6 +3287,22 @@ function addInitialLevel1Screen1() {
 }
 
 function addInitialLevel1Screen2() {
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 100, y: GROUND_Y - 110, w: 85, h: 20},
+        {x: 280, y: GROUND_Y - 140, w: 95, h: 20},
+        {x: 480, y: GROUND_Y - 170, w: 105, h: 20},
+        {x: 680, y: GROUND_Y - 150, w: 90, h: 20},
+        {x: 880, y: GROUND_Y - 130, w: 100, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+    
     // Add 2-3 blue flying enemies
     for (let i = 0; i < 3; i++) {
         let x = 350 + i * 180;
@@ -2540,6 +3314,22 @@ function addInitialLevel1Screen2() {
 }
 
 function addInitialLevel1Screen3() {
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 130, y: GROUND_Y - 120, w: 90, h: 20},
+        {x: 320, y: GROUND_Y - 150, w: 100, h: 20},
+        {x: 520, y: GROUND_Y - 180, w: 110, h: 20},
+        {x: 720, y: GROUND_Y - 160, w: 95, h: 20},
+        {x: 920, y: GROUND_Y - 140, w: 105, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+    
     // Add 2-3 white enemies
     for (let i = 0; i < 3; i++) {
         let x = 450 + i * 160;
@@ -2558,28 +3348,442 @@ function addInitialLevel1Screen3() {
     }
 }
 
-// --- LEVEL 2-6 INITIAL ENEMY FUNCTIONS (EMPTY FOR NOW) ---
-function addInitialLevel2Screen0() { /* Empty screen */ }
-function addInitialLevel2Screen1() { /* Empty screen */ }
-function addInitialLevel2Screen2() { /* Empty screen */ }
-function addInitialLevel2Screen3() { /* Empty screen */ }
+// --- LEVEL 2-6 INITIAL ENEMY FUNCTIONS ---
+function addInitialLevel2Screen0() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 140, y: GROUND_Y - 130, w: 95, h: 20},
+        {x: 340, y: GROUND_Y - 160, w: 105, h: 20},
+        {x: 540, y: GROUND_Y - 190, w: 115, h: 20},
+        {x: 740, y: GROUND_Y - 170, w: 100, h: 20},
+        {x: 940, y: GROUND_Y - 150, w: 110, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+function addInitialLevel2Screen1() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 110, y: GROUND_Y - 140, w: 100, h: 20},
+        {x: 310, y: GROUND_Y - 170, w: 110, h: 20},
+        {x: 510, y: GROUND_Y - 200, w: 120, h: 20},
+        {x: 710, y: GROUND_Y - 180, w: 105, h: 20},
+        {x: 910, y: GROUND_Y - 160, w: 115, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+function addInitialLevel2Screen2() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 160, y: GROUND_Y - 150, w: 105, h: 20},
+        {x: 360, y: GROUND_Y - 180, w: 115, h: 20},
+        {x: 560, y: GROUND_Y - 210, w: 125, h: 20},
+        {x: 760, y: GROUND_Y - 190, w: 110, h: 20},
+        {x: 960, y: GROUND_Y - 170, w: 120, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+function addInitialLevel2Screen3() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 125, y: GROUND_Y - 160, w: 110, h: 20},
+        {x: 325, y: GROUND_Y - 190, w: 120, h: 20},
+        {x: 525, y: GROUND_Y - 220, w: 130, h: 20},
+        {x: 725, y: GROUND_Y - 200, w: 115, h: 20},
+        {x: 925, y: GROUND_Y - 180, w: 125, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
 
-function addInitialLevel3Screen0() { /* Empty screen */ }
-function addInitialLevel3Screen1() { /* Empty screen */ }
-function addInitialLevel3Screen2() { /* Empty screen */ }
-function addInitialLevel3Screen3() { /* Empty screen */ }
+function addInitialLevel3Screen0() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 150, y: GROUND_Y - 170, w: 115, h: 20},
+        {x: 350, y: GROUND_Y - 200, w: 125, h: 20},
+        {x: 550, y: GROUND_Y - 230, w: 135, h: 20},
+        {x: 750, y: GROUND_Y - 210, w: 120, h: 20},
+        {x: 950, y: GROUND_Y - 190, w: 130, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+function addInitialLevel3Screen1() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 135, y: GROUND_Y - 180, w: 120, h: 20},
+        {x: 335, y: GROUND_Y - 210, w: 130, h: 20},
+        {x: 535, y: GROUND_Y - 240, w: 140, h: 20},
+        {x: 735, y: GROUND_Y - 220, w: 125, h: 20},
+        {x: 935, y: GROUND_Y - 200, w: 135, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+function addInitialLevel3Screen2() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 145, y: GROUND_Y - 190, w: 125, h: 20},
+        {x: 345, y: GROUND_Y - 220, w: 135, h: 20},
+        {x: 545, y: GROUND_Y - 250, w: 145, h: 20},
+        {x: 745, y: GROUND_Y - 230, w: 130, h: 20},
+        {x: 945, y: GROUND_Y - 210, w: 140, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+function addInitialLevel3Screen3() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 155, y: GROUND_Y - 200, w: 130, h: 20},
+        {x: 355, y: GROUND_Y - 230, w: 140, h: 20},
+        {x: 555, y: GROUND_Y - 260, w: 150, h: 20},
+        {x: 755, y: GROUND_Y - 240, w: 135, h: 20},
+        {x: 955, y: GROUND_Y - 220, w: 145, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
 
-function addInitialLevel4Screen0() { /* Empty screen */ }
-function addInitialLevel4Screen1() { /* Empty screen */ }
-function addInitialLevel4Screen2() { /* Empty screen */ }
-function addInitialLevel4Screen3() { /* Empty screen */ }
+// --- LEVEL 4 INITIAL ENEMY FUNCTIONS ---
+function addInitialLevel4Screen0() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 160, y: GROUND_Y - 210, w: 135, h: 20},
+        {x: 360, y: GROUND_Y - 240, w: 145, h: 20},
+        {x: 560, y: GROUND_Y - 270, w: 155, h: 20},
+        {x: 760, y: GROUND_Y - 250, w: 140, h: 20},
+        {x: 960, y: GROUND_Y - 230, w: 150, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
 
-function addInitialLevel5Screen0() { /* Empty screen */ }
-function addInitialLevel5Screen1() { /* Empty screen */ }
-function addInitialLevel5Screen2() { /* Empty screen */ }
-function addInitialLevel5Screen3() { /* Empty screen */ }
+function addInitialLevel4Screen1() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 140, y: GROUND_Y - 220, w: 140, h: 20},
+        {x: 340, y: GROUND_Y - 250, w: 150, h: 20},
+        {x: 540, y: GROUND_Y - 280, w: 160, h: 20},
+        {x: 740, y: GROUND_Y - 260, w: 145, h: 20},
+        {x: 940, y: GROUND_Y - 240, w: 155, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
 
-function addInitialLevel6Screen0() { /* Empty screen */ }
-function addInitialLevel6Screen1() { /* Empty screen */ }
-function addInitialLevel6Screen2() { /* Empty screen */ }
-function addInitialLevel6Screen3() { /* Empty screen */ } 
+function addInitialLevel4Screen2() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 150, y: GROUND_Y - 230, w: 145, h: 20},
+        {x: 350, y: GROUND_Y - 260, w: 155, h: 20},
+        {x: 550, y: GROUND_Y - 290, w: 165, h: 20},
+        {x: 750, y: GROUND_Y - 270, w: 150, h: 20},
+        {x: 950, y: GROUND_Y - 250, w: 160, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+
+function addInitialLevel4Screen3() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 145, y: GROUND_Y - 240, w: 150, h: 20},
+        {x: 345, y: GROUND_Y - 270, w: 160, h: 20},
+        {x: 545, y: GROUND_Y - 300, w: 170, h: 20},
+        {x: 745, y: GROUND_Y - 280, w: 155, h: 20},
+        {x: 945, y: GROUND_Y - 260, w: 165, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+
+// --- LEVEL 5 INITIAL ENEMY FUNCTIONS ---
+function addInitialLevel5Screen0() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 170, y: GROUND_Y - 250, w: 155, h: 20},
+        {x: 370, y: GROUND_Y - 280, w: 165, h: 20},
+        {x: 570, y: GROUND_Y - 310, w: 175, h: 20},
+        {x: 770, y: GROUND_Y - 290, w: 160, h: 20},
+        {x: 970, y: GROUND_Y - 270, w: 170, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+
+function addInitialLevel5Screen1() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 155, y: GROUND_Y - 260, w: 160, h: 20},
+        {x: 355, y: GROUND_Y - 290, w: 170, h: 20},
+        {x: 555, y: GROUND_Y - 320, w: 180, h: 20},
+        {x: 755, y: GROUND_Y - 300, w: 165, h: 20},
+        {x: 955, y: GROUND_Y - 280, w: 175, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+
+function addInitialLevel5Screen2() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 165, y: GROUND_Y - 270, w: 165, h: 20},
+        {x: 365, y: GROUND_Y - 300, w: 175, h: 20},
+        {x: 565, y: GROUND_Y - 330, w: 185, h: 20},
+        {x: 765, y: GROUND_Y - 310, w: 170, h: 20},
+        {x: 965, y: GROUND_Y - 290, w: 180, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+
+function addInitialLevel5Screen3() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 160, y: GROUND_Y - 280, w: 170, h: 20},
+        {x: 360, y: GROUND_Y - 310, w: 180, h: 20},
+        {x: 560, y: GROUND_Y - 340, w: 190, h: 20},
+        {x: 760, y: GROUND_Y - 320, w: 175, h: 20},
+        {x: 960, y: GROUND_Y - 300, w: 185, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+
+// --- LEVEL 6 INITIAL ENEMY FUNCTIONS ---
+function addInitialLevel6Screen0() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 180, y: GROUND_Y - 290, w: 175, h: 20},
+        {x: 380, y: GROUND_Y - 320, w: 185, h: 20},
+        {x: 580, y: GROUND_Y - 350, w: 195, h: 20},
+        {x: 780, y: GROUND_Y - 330, w: 180, h: 20},
+        {x: 980, y: GROUND_Y - 310, w: 190, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+
+function addInitialLevel6Screen1() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 170, y: GROUND_Y - 300, w: 180, h: 20},
+        {x: 370, y: GROUND_Y - 330, w: 190, h: 20},
+        {x: 570, y: GROUND_Y - 360, w: 200, h: 20},
+        {x: 770, y: GROUND_Y - 340, w: 185, h: 20},
+        {x: 970, y: GROUND_Y - 320, w: 195, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+
+function addInitialLevel6Screen2() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 175, y: GROUND_Y - 310, w: 185, h: 20},
+        {x: 375, y: GROUND_Y - 340, w: 195, h: 20},
+        {x: 575, y: GROUND_Y - 370, w: 205, h: 20},
+        {x: 775, y: GROUND_Y - 350, w: 190, h: 20},
+        {x: 975, y: GROUND_Y - 330, w: 200, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+
+function addInitialLevel6Screen3() { 
+    // Add platforms for the player to jump on
+    let platformPositions = [
+        {x: 165, y: GROUND_Y - 320, w: 190, h: 20},
+        {x: 365, y: GROUND_Y - 350, w: 200, h: 20},
+        {x: 565, y: GROUND_Y - 380, w: 210, h: 20},
+        {x: 765, y: GROUND_Y - 360, w: 195, h: 20},
+        {x: 965, y: GROUND_Y - 340, w: 205, h: 20}
+    ];
+    
+    for (let i = 0; i < platformPositions.length; i++) {
+        let platform = platformPositions[i];
+        let obstacle = new Obstacle(platform.x, platform.y, platform.w, platform.h);
+        obstacle.speed = 0; // Stationary platforms
+        obstacles.push(obstacle);
+    }
+}
+
+// Function to get spawn point for level and screen
+function getSpawnPointForLevel(level, screen) {
+    // Default spawn point for all levels and screens
+    return { x: 80, y: GROUND_Y - 75 };
+}
+
+// Function to get level information
+function getLevelInfo() {
+    if (LEVEL_CONFIGS[currentLevel] && LEVEL_CONFIGS[currentLevel].screens[currentScreen]) {
+        const levelConfig = LEVEL_CONFIGS[currentLevel];
+        const screenConfig = levelConfig.screens[currentScreen];
+        return {
+            levelName: levelConfig.name,
+            screenName: screenConfig.name,
+            theme: levelConfig.theme,
+            description: screenConfig.description
+        };
+    }
+    return {
+        levelName: "Unknown Level",
+        screenName: "Unknown Screen",
+        theme: "Unknown",
+        description: "Unknown"
+    };
+}
+
+// Function to add initial enemies for level and screen
+function addInitialEnemiesForLevel(level, screen) {
+    if (LEVEL_CONFIGS[level] && LEVEL_CONFIGS[level].screens[screen]) {
+        const spawnFunction = LEVEL_CONFIGS[level].screens[screen].spawnFunction;
+        if (spawnFunction) {
+            spawnFunction();
+        }
+    }
+}
+
+// Function to get spawn point for each screen (1-12) - kept for compatibility
+function getSpawnPointForScreen(screenNumber) {
+    const spawnPoints = {
+        1: { x: 150, y: GROUND_Y - 195 },
+        2: { x: 120, y: GROUND_Y - 175 },
+        3: { x: 100, y: GROUND_Y - 185 },
+        4: { x: 130, y: GROUND_Y - 195 },
+        5: { x: 140, y: GROUND_Y - 205 },
+        6: { x: 110, y: GROUND_Y - 215 },
+        7: { x: 160, y: GROUND_Y - 225 },
+        8: { x: 125, y: GROUND_Y - 235 },
+        9: { x: 150, y: GROUND_Y - 245 },
+        10: { x: 135, y: GROUND_Y - 255 },
+        11: { x: 145, y: GROUND_Y - 265 },
+        12: { x: 155, y: GROUND_Y - 275 }
+    };
+    
+    return spawnPoints[screenNumber] || { x: 80, y: GROUND_Y - 75 };
+}
+
+// Function to get screen name for each screen (1-12)
+function getScreenName(screenNumber) {
+    const screenNames = {
+        1: "Platforms",
+        2: "Yellow Enemies", 
+        3: "Blue Enemies",
+        4: "White Enemies",
+        5: "Gap Jumping",
+        6: "Enemy Timing",
+        7: "Mixed Threats",
+        8: "Speed Challenge",
+        9: "Precision Jumps",
+        10: "Enemy Waves",
+        11: "Aerial Combat",
+        12: "Chaos Control"
+    };
+    
+    return screenNames[screenNumber] || "Unknown";
+}
+
+
+
+
+
+ 

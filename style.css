@@ -588,7 +588,7 @@ body {
 
 #level-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 15px;
     margin-bottom: 30px;
     max-width: 600px;
@@ -597,7 +597,7 @@ body {
 }
 
 .level-btn {
-    background: linear-gradient(45deg, #667eea, #764ba2);
+    background: black;
     color: white;
     border: 2px solid white;
     padding: 20px;
@@ -617,17 +617,20 @@ body {
 
 .level-btn:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+    box-shadow: 0 8px 25px rgba(255, 255, 255, 0.3);
+    background: #1a1a1a;
 }
 
 .level-btn.locked {
-    background: linear-gradient(45deg, #666, #999);
+    background: #333;
     cursor: not-allowed;
     opacity: 0.6;
+    border-color: #666;
 }
 
 .level-btn.completed {
-    background: linear-gradient(45deg, #4CAF50, #45a049);
+    background: #1a1a1a;
+    border-color: #4CAF50;
 }
 
 #back-to-title {
@@ -647,6 +650,28 @@ body {
 }
 
 #back-to-title:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+}
+
+#level-select-back-btn {
+    background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+    color: white;
+    border: 2px solid white;
+    padding: 12px 24px;
+    font-size: 8px;
+    font-family: 'Press Start 2P', cursive;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    line-height: 1.4;
+    margin-top: 20px;
+}
+
+#level-select-back-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
 }
@@ -730,6 +755,24 @@ body {
     border-radius: 10px;
     border: 2px solid rgba(255, 255, 255, 0.3);
     backdrop-filter: blur(5px);
+}
+
+.double-jump-indicator {
+    background: rgba(255, 255, 0, 0.3) !important;
+    color: #ffff00 !important;
+    border: 2px solid #ffff00 !important;
+    animation: doubleJumpPulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes doubleJumpPulse {
+    from {
+        opacity: 0.7;
+        transform: scale(1);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1.05);
+    }
 }
 
 #game-over, #level-complete {
