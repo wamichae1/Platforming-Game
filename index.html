@@ -27,18 +27,61 @@
         <div id="loading-screen" class="screen active">
             <div class="loading-content">
                 <div class="loading-spinner"></div>
-                <div class="loading-text">Loading HoloNight...</div>
+                <div class="loading-text">Loading...</div>
             </div>
         </div>
 
         <!-- Title Screen -->
         <div id="title-screen" class="screen hidden">
+            <button id="instructions-btn" class="corner-btn">?</button>
             <div class="title-content">
                 <h1>HoloNight</h1>
                 <div class="title-menu">
                     <button id="start-btn">START GAME</button>
                     <button id="settings-btn">SETTINGS</button>
                     <button id="credits-btn">CREDITS</button>
+                </div>
+            </div>
+        </div>
+        <!-- Instructions Screen -->
+        <div id="instructions-screen" class="screen hidden">
+            <div class="instructions-content">
+                <h2>INSTRUCTIONS</h2>
+                <div class="instruction-list">
+                    <div class="instruction-block">
+                        <div class="instruction-visual" id="instruction-move">
+                            <span class="key-label">A</span>
+                            <span class="arrow-label">&#8592;</span>
+                            <span class="key-label">D</span>
+                            <span class="arrow-label">&#8594;</span>
+                        </div>
+                        <div class="instruction-label">Move Left &amp; Right</div>
+                        <div class="instruction-desc">Use these keys to walk.</div>
+                    </div>
+                    <div class="instruction-block">
+                        <div class="instruction-visual" id="instruction-jump">
+                            <span class="key-label">Space</span>
+                        </div>
+                        <div class="instruction-label">Jump</div>
+                        <div class="instruction-desc">Press to jump over obstacles.</div>
+                    </div>
+                    <div class="instruction-block">
+                        <div class="instruction-visual" id="instruction-dash">
+                            <span class="key-label">E</span>
+                        </div>
+                        <div class="instruction-label">Dash</div>
+                        <div class="instruction-desc">Quickly dash forward.</div>
+                    </div>
+                    <div class="instruction-block">
+                        <div class="instruction-visual" id="instruction-attack">
+                            <span class="key-label">LMB</span>
+                        </div>
+                        <div class="instruction-label">Attack</div>
+                        <div class="instruction-desc">Attack enemies in around you.</div>
+                    </div>
+                </div>
+                <div class="instructions-nav" style="justify-content: center; margin-top: 32px; flex-direction: column; align-items: center; border: none; background: none;">
+                    <button id="instructions-back-menu-btn" style="display: inline-block !important; margin-top: 32px;">Back to Menu</button>
                 </div>
             </div>
         </div>

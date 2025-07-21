@@ -8,7 +8,8 @@ class ScreenManager {
             levelSelect: document.getElementById('level-select-screen'),
             settings: document.getElementById('settings-screen'),
             credits: document.getElementById('credits-screen'),
-            game: document.getElementById('game-screen')
+            game: document.getElementById('game-screen'),
+            instructions: document.getElementById('instructions-screen')
         };
         this.modals = {
             pause: {
@@ -48,7 +49,7 @@ class ScreenManager {
         }
 
         // Check if we're transitioning from a non-game screen to another non-game screen
-        const nonGameScreens = ['loading', 'title', 'levelSelect', 'settings', 'credits'];
+        const nonGameScreens = ['loading', 'title', 'levelSelect', 'settings', 'credits', 'instructions'];
         const isFromNonGame = nonGameScreens.includes(this.currentScreen);
         const isToNonGame = nonGameScreens.includes(screenName);
         
@@ -169,6 +170,9 @@ class ScreenManager {
                 break;
             case 'levelSelect':
                 // Level select specific logic
+                break;
+            case 'instructions':
+                // Instructions screen specific logic
                 break;
         }
     }
@@ -533,6 +537,7 @@ function setupEventListeners() {
     const startBtn = document.getElementById('start-btn');
     const settingsBtn = document.getElementById('settings-btn');
     const creditsBtn = document.getElementById('credits-btn');
+    const instructionsBtn = document.getElementById('instructions-btn');
     
     if (startBtn) {
         startBtn.addEventListener('click', function() {
@@ -554,6 +559,22 @@ function setupEventListeners() {
         creditsBtn.addEventListener('click', function() {
             console.log('Credits button clicked');
             screenManager.showScreen('credits');
+        });
+    }
+    
+    if (instructionsBtn) {
+        instructionsBtn.addEventListener('click', function() {
+            console.log('Instructions button clicked');
+            screenManager.showScreen('instructions');
+        });
+    }
+    
+    // Instructions screen back button
+    const instructionsBackBtn = document.getElementById('instructions-back-btn');
+    if (instructionsBackBtn) {
+        instructionsBackBtn.addEventListener('click', function() {
+            console.log('Instructions back button clicked');
+            screenManager.showScreen('title');
         });
     }
     
@@ -779,6 +800,14 @@ function setupEventListeners() {
     });
     
     console.log('Event listeners setup complete');
+    
+    // Instructions screen: Back to Menu button
+    const instructionsBackMenuBtn = document.getElementById('instructions-back-menu-btn');
+    if (instructionsBackMenuBtn) {
+        instructionsBackMenuBtn.onclick = function() {
+            screenManager.showScreen('title');
+        };
+    }
 }
 
 function toggleGameMenu() {
@@ -1116,11 +1145,11 @@ function checkCollisions() {
         });
     }
     
-    // Reset dash when landing on ground
-    if (player.onGround && !player.wasOnGround) {
+    // Reset dash when landing on ground or spike (but not in air)
+    if ((player.onGround || player.onSpike) && !player.wasOnGround) {
         player.canDash = true;
     }
-    player.wasOnGround = player.onGround;
+    player.wasOnGround = player.onGround || player.onSpike;
 }
 
 function updateUI() {
@@ -1229,8 +1258,10 @@ class Player {
         
         // Handle dash input
         if (isKeyDownFor('dash')) {
-            if (!this.dashKeyPressed && !this.isDashing && this.canDash && this.dashCooldown <= 0) {
+            // Only allow dash if canDash is true and player is NOT on ground or spike (air dash only)
+            if (!this.dashKeyPressed && !this.isDashing && this.canDash && !this.onGround && !this.onSpike && this.dashCooldown <= 0) {
                 this.startDash();
+                this.canDash = false; // Use up air dash
                 this.dashKeyPressed = true;
             }
         } else {
@@ -3780,6 +3811,111 @@ function getScreenName(screenNumber) {
     };
     
     return screenNames[screenNumber] || "Unknown";
+}
+
+// Instructions screen carousel logic
+function setupInstructionsCarousel() {
+    const slides = Array.from(document.querySelectorAll('.instruction-slide'));
+    const backBtn = document.getElementById('instructions-back-btn');
+    const nextBtn = document.getElementById('instructions-next-btn');
+    const menuBtn = document.getElementById('instructions-menu-btn');
+    let currentStep = 1;
+    function showStep(step) {
+        slides.forEach(slide => {
+            slide.style.display = (parseInt(slide.dataset.step) === step) ? '' : 'none';
+        });
+        // Back button only visible after first slide
+        if (backBtn) backBtn.style.display = (step > 1) ? '' : 'none';
+        // Next button only visible before last slide
+        if (nextBtn) nextBtn.style.display = (step < slides.length) ? '' : 'none';
+        // Menu button only visible on last slide
+        if (menuBtn) menuBtn.style.display = (step === slides.length) ? '' : 'none';
+    }
+    if (backBtn) backBtn.onclick = function() {
+        if (currentStep > 1) {
+            currentStep--;
+            showStep(currentStep);
+        }
+    };
+    if (nextBtn) nextBtn.onclick = function() {
+        if (currentStep < slides.length) {
+            currentStep++;
+            showStep(currentStep);
+        }
+    };
+    if (menuBtn) menuBtn.onclick = function() {
+        screenManager.showScreen('title');
+    };
+    // When instructions screen is shown, always start at step 1
+    const observer = new MutationObserver(() => {
+        const instructionsScreen = document.getElementById('instructions-screen');
+        if (instructionsScreen && instructionsScreen.classList.contains('active')) {
+            currentStep = 1;
+            showStep(currentStep);
+        }
+    });
+    observer.observe(document.getElementById('instructions-screen'), { attributes: true, attributeFilter: ['class'] });
+}
+setupInstructionsCarousel();
+
+// Instructions screen: Back to Menu button
+const instructionsBackMenuBtn = document.getElementById('instructions-back-menu-btn');
+if (instructionsBackMenuBtn) {
+    instructionsBackMenuBtn.onclick = function() {
+        screenManager.showScreen('title');
+    };
+}
+
+// --- Update Instructions Key Labels ---
+function updateInstructionsKeyLabels() {
+    // Move Left & Right (show only one key for each, no slashes)
+    const leftKey = keyBindings.left && keyBindings.left.length > 0 ? formatKeyLabel(keyBindings.left[0]) : 'A';
+    const rightKey = keyBindings.right && keyBindings.right.length > 0 ? formatKeyLabel(keyBindings.right[0]) : 'D';
+    const moveBlock = document.getElementById('instruction-move');
+    if (moveBlock) {
+        moveBlock.innerHTML = `<span class="key-label">${leftKey}</span> <span class="arrow-label">&#8592;</span> <span class="key-label">${rightKey}</span> <span class="arrow-label">&#8594;</span>`;
+    }
+    // Jump
+    const jumpBlock = document.getElementById('instruction-jump');
+    if (jumpBlock) {
+        jumpBlock.innerHTML = `<span class="key-label">${(keyBindings.jump && keyBindings.jump.map(formatKeyLabel).join(' / ')) || 'Space'}</span>`;
+    }
+    // Dash
+    const dashBlock = document.getElementById('instruction-dash');
+    if (dashBlock) {
+        dashBlock.innerHTML = `<span class="key-label">${(keyBindings.dash && keyBindings.dash.map(formatKeyLabel).join(' / ')) || 'E'}</span>`;
+    }
+    // Attack
+    const attackBlock = document.getElementById('instruction-attack');
+    if (attackBlock) {
+        attackBlock.innerHTML = `<span class="key-label">${(keyBindings.attack && keyBindings.attack.map(formatKeyLabel).join(' / ')) || 'LMB'}</span>`;
+    }
+}
+
+function formatKeyLabel(key) {
+    if (key === ' ') return 'Space';
+    if (key.startsWith('Arrow')) return key.replace('Arrow', '');
+    if (key.startsWith('Mouse')) return key === 'Mouse0' ? 'LMB' : key;
+    return key.length === 1 ? key.toUpperCase() : key;
+}
+
+// Call updateInstructionsKeyLabels when instructions screen is shown
+const instructionsScreen = document.getElementById('instructions-screen');
+if (instructionsScreen) {
+    const observer = new MutationObserver(() => {
+        if (instructionsScreen.classList.contains('active')) {
+            updateInstructionsKeyLabels();
+        }
+    });
+    observer.observe(instructionsScreen, { attributes: true, attributeFilter: ['class'] });
+}
+// Also call after key bindings are changed
+if (typeof updateKeyBindingButtons === 'function') {
+    const origUpdateKeyBindingButtons = updateKeyBindingButtons;
+    updateKeyBindingButtons = function() {
+        origUpdateKeyBindingButtons.apply(this, arguments);
+        updateInstructionsKeyLabels();
+    };
 }
 
 
